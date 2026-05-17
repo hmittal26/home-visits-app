@@ -1,3 +1,5 @@
+import { supabase } from "./supabase";
+
 import { useState, useEffect } from "react";
 
 const C = {
@@ -178,62 +180,78 @@ export default function App() {
     note: "",
   });
 
-  useEffect(() => {
-    const saved = localStorage.getItem("hv-v4");
+ useEffect(() => {
+  fetchVisits();
 
-    if (saved) {
-      setVisits(JSON.parse(saved));
-    } else {
-      const SEED = makeSeed();
-      localStorage.setItem("hv-v4", JSON.stringify(SEED));
-      setVisits(SEED);
-    }
+  const channel = supabase
+    .channel("visits-realtime")
+    .on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "visits",
+      },
+      () => {
+        fetchVisits();
+      }
+    )
+    .subscribe();
 
-    setLoading(false);
-  }, []);
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}, []);
 
-  async function persist(v) {
-    localStorage.setItem("hv-v4", JSON.stringify(v));
+async function fetchVisits() {
+  const { data } = await supabase
+    .from("visits")
+    .select("*")
+    .order("date", { ascending: false });
+
+  if (data) {
+    setVisits(data);
   }
 
-  async function save(u) {
-    setVisits(u);
-    await persist(u);
-  }
+  setLoading(false);
+}
+
+ 
 
   async function addVisit() {
-    if (!form.visitor.trim() || !form.host.trim()) return;
+  if (!form.visitor.trim() || !form.host.trim()) return;
 
-    const v = {
-      id: Date.now(),
+  await supabase.from("visits").insert([
+    {
       visitor: form.visitor.trim(),
       host: form.host.trim(),
       date: form.date || new Date().toISOString(),
       note: form.note.trim(),
-      logged: new Date().toISOString(),
-    };
+    },
+  ]);
 
-    await save([v, ...visits]);
+  setForm({
+    visitor: "",
+    host: "",
+    date: "",
+    note: "",
+  });
 
-    setForm({
-      visitor: "",
-      host: "",
-      date: "",
-      note: "",
-    });
+  setAdding(false);
+}
 
-    setAdding(false);
-  }
+async function remove(id) {
+  await supabase
+    .from("visits")
+    .delete()
+    .eq("id", id);
+}
 
-  async function remove(id) {
-    await save(visits.filter((v) => v.id !== id));
-  }
-
-  const pages = [
-    ["log", "📋 Log"],
-    ["summary", "📊 Summary"],
-    ["person", "👤 By Person"],
-  ];
+const pages = [
+  ["log", "📋 Log"],
+  ["summary", "📊 Summary"],
+  ["person", "👤 By Person"],
+];
 
   return (
     <div
