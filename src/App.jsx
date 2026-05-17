@@ -1356,10 +1356,22 @@ function PersonPage({ visits }) {
       </div>
 
       {/* VISITS MADE */}
-      <Section
-        title={`↑ Visits Made by ${sel}`}
-        sub={`${personVisits.length} total`}
-      >
+      <div
+  style={{
+    fontSize: 22,
+    fontWeight: 800,
+    color: C.accent,
+    marginBottom: 14,
+    marginTop: 10,
+    letterSpacing: "-0.02em",
+  }}
+>
+  ↑ Visits Made by {sel}
+</div>
+
+<Section
+  sub={`${personVisits.length} total`}
+>
         {personVisits.length === 0 ? (
           <NoData />
         ) : (
@@ -1400,10 +1412,22 @@ function PersonPage({ visits }) {
       </Section>
 
       {/* VISITS RECEIVED */}
-      <Section
-        title={`↓ Visits Received by ${sel}`}
-        sub={`${receivedVisits.length} total`}
-      >
+      <div
+  style={{
+    fontSize: 22,
+    fontWeight: 800,
+    color: C.green,
+    marginBottom: 14,
+    marginTop: 24,
+    letterSpacing: "-0.02em",
+  }}
+>
+  ↓ Visits Received by {sel}
+</div>
+
+<Section
+  sub={`${receivedVisits.length} total`}
+>
         {receivedVisits.length === 0 ? (
           <NoData />
         ) : (
