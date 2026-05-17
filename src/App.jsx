@@ -172,7 +172,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
   const [filter, setFilter] = useState("");
-
+const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState({
     visitor: "",
     host: "",
@@ -218,17 +218,33 @@ async function fetchVisits() {
 
  
 
-  async function addVisit() {
+async function addVisit() {
   if (!form.visitor.trim() || !form.host.trim()) return;
 
-  await supabase.from("visits").insert([
-    {
-      visitor: form.visitor.trim(),
-      host: form.host.trim(),
-      date: form.date || new Date().toISOString(),
-      note: form.note.trim(),
-    },
-  ]);
+  if (editingId) {
+    await supabase
+      .from("visits")
+      .update({
+        visitor: form.visitor.trim(),
+        host: form.host.trim(),
+        date: form.date,
+        note: form.note.trim(),
+      })
+      .eq("id", editingId);
+
+    setEditingId(null);
+  } else {
+    await supabase
+      .from("visits")
+      .insert([
+        {
+          visitor: form.visitor.trim(),
+          host: form.host.trim(),
+          date: form.date || new Date().toISOString(),
+          note: form.note.trim(),
+        },
+      ]);
+  }
 
   setForm({
     visitor: "",
@@ -238,13 +254,23 @@ async function fetchVisits() {
   });
 
   setAdding(false);
+
+  fetchVisits();
 }
 
 async function remove(id) {
-  await supabase
+  const { error } = await supabase
     .from("visits")
     .delete()
-    .eq("id", id);
+    .eq("id", String(id));
+
+  if (error) {
+    console.error(error);
+    alert("Delete failed");
+    return;
+  }
+
+  fetchVisits();
 }
 
 const pages = [
@@ -408,6 +434,8 @@ const pages = [
           setForm={setForm}
           addVisit={addVisit}
           remove={remove}
+          editingId={editingId}
+setEditingId={setEditingId}
         />
       ) : page === "summary" ? (
         <SummaryPage visits={visits} />
@@ -430,6 +458,8 @@ function LogPage({
   setForm,
   addVisit,
   remove,
+  editingId,
+  setEditingId,
 }) {
   const filtered = visits.filter(
     (v) =>
@@ -438,6 +468,7 @@ function LogPage({
       v.host.toLowerCase().includes(filter.toLowerCase())
   );
 
+const [menuOpen, setMenuOpen] = useState("");
   const groups = {};
 
   filtered.forEach((v) => {
@@ -445,6 +476,8 @@ function LogPage({
 
     (groups[k] = groups[k] || []).push(v);
   });
+
+ 
 
   return (
     <div
@@ -475,8 +508,20 @@ function LogPage({
         />
 
         <button
-          onClick={() => setAdding(!adding)}
-          style={{
+onClick={() => {
+  setAdding(!adding);
+
+  if (adding) {
+    setEditingId(null);
+
+    setForm({
+      visitor: "",
+      host: "",
+      date: "",
+      note: "",
+    });
+  }
+}}          style={{
             background: adding ? C.border : C.accent,
             color: adding ? C.ink : "#fff",
             border: "none",
@@ -609,7 +654,7 @@ function LogPage({
               fontFamily: "inherit",
             }}
           >
-            Save Visit
+            {editingId ? "Update Visit" : "Save Visit"}
           </button>
         </div>
       )}
@@ -717,18 +762,114 @@ function LogPage({
                   )}
                 </div>
 
-                <button
-                  onClick={() => remove(v.id)}
-                  style={{
-                    background: "none",
-                    border: "none",
-                    color: C.soft,
-                    cursor: "pointer",
-                    fontSize: 18,
-                  }}
-                >
-                  ×
-                </button>
+                <div
+  style={{
+    position: "relative",
+    alignSelf: "flex-start",
+  }}
+>
+  <button
+    onClick={(e) => {
+  e.stopPropagation();
+
+ setMenuOpen((prev) =>
+  prev === String(v.id)
+    ? ""
+    : String(v.id)
+);
+}}
+    style={{
+      background: "none",
+      border: "none",
+      color: C.soft,
+      cursor: "pointer",
+      fontSize: 18,
+      padding: "4px 8px",
+      borderRadius: 6,
+    }}
+  >
+    ⋮
+  </button>
+
+  {menuOpen === String(v.id) && (
+  <div
+    onClick={(e) => e.stopPropagation()}
+    style={{
+      position: "absolute",
+      right: 0,
+      top: 32,
+      background: "#fff",
+      border: `1px solid ${C.border}`,
+      borderRadius: 12,
+      boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+      overflow: "hidden",
+      zIndex: 100,
+      minWidth: 140,
+      display: "flex",
+      flexDirection: "column",
+    }}
+  >
+    <button
+      onClick={() => {
+        setForm({
+          visitor: v.visitor,
+          host: v.host,
+          date: v.date.slice(0, 16),
+          note: v.note || "",
+        });
+
+        setEditingId(v.id);
+        setAdding(true);
+
+        window.scrollTo({
+          top: 0,
+          behavior: "smooth",
+        });
+
+        setMenuOpen("");
+      }}
+      style={{
+        border: "none",
+        background: "#fff",
+        padding: "12px 14px",
+        textAlign: "left",
+        cursor: "pointer",
+        fontFamily: "inherit",
+        fontSize: 14,
+        color: C.ink,
+      }}
+    >
+      ✏️ Edit
+    </button>
+
+    <button
+      onClick={() => {
+  const ok = window.confirm(
+    "Are you sure you want to delete this visit?"
+  );
+
+  if (!ok) return;
+
+  remove(v.id);
+  setMenuOpen("");
+}}
+      style={{
+        border: "none",
+        background: "#fff",
+        padding: "12px 14px",
+        textAlign: "left",
+        cursor: "pointer",
+        fontFamily: "inherit",
+        fontSize: 14,
+        color: "#B00020",
+        borderTop: `1px solid ${C.border}`,
+      }}
+    >
+      🗑 Delete
+    </button>
+  </div>
+)}
+</div>
               </div>
             ))}
           </div>
